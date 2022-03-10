@@ -1,0 +1,80 @@
+# This template creates disk acquisition step functions in the Security Account.
+# © 2021 Amazon Web Services, Inc. or its affiliates. All Rights Reserved.  
+# This AWS Content is provided subject to the terms of the AWS Customer Agreement available at  
+# http://aws.amazon.com/agreement or other written agreement between Customer and either
+# Amazon Web Services, Inc. or Amazon Web Services EMEA SARL or both.
+
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: The kernel module factory.  It will create the S3 bucket for memory modules. 
+
+Parameters:
+
+  pSecurtiyAccount:
+    Type: String
+    Description: AWS Account Number of the Security Account where snapshot processing occurs
+    AllowedPattern: "[0-9]*"
+    MaxLength: 12
+    MinLength: 12
+    ConstraintDescription: account number must contain only numbers.
+
+  pOrgId:
+    Type: String
+    Description: Organization ID to which the target accounts belong
+    AllowedPattern: "^o-[a-z0-9]{10,32}$"
+    MaxLength: 34
+    MinLength: 12
+    ConstraintDescription: Organization ID string requires "o-" followed by from 10 to 32 lowercase letters or digits.
+
+Resources:
+
+  rArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::AccountId}-memory-modules'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  rArtifactBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref rArtifactBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: DenyInsecureConnections
+          Effect: Deny
+          Principal: "*"
+          Action: s3:*
+          Resource: !Sub "arn:${AWS::Partition}:s3:::${rArtifactBucket}/*"
+          Condition:
+            Bool:
+              aws:SecureTransport: 'false'
+        - Sid: MemoryAcquisitionAccess
+          Effect: Allow
+          Principal:
+            AWS: !Sub arn:aws:iam::${pSecurtiyAccount}:role/MemoryAcquisition
+          Action:
+            - s3:Get*
+            - s3:List*
+          Resource:
+            - !Sub "arn:${AWS::Partition}:s3:::${rArtifactBucket}/*"
+            - !Sub "arn:${AWS::Partition}:s3:::${rArtifactBucket}"
+        - Sid: AWSOrgAccessToMemoryModules
+          Principal: "*"
+          Action:
+            - s3:Get*
+            - s3:List*
+          Resource:
+            - !Sub "arn:${AWS::Partition}:s3:::${rArtifactBucket}/*"
+          Effect: "Allow"
+          Condition:
+            StringEquals:
+              aws:PrincipalOrgID: !Sub "${pOrgId}"
+
+Outputs:
+  ArtifactBucket:
+    Value: !GetAtt rArtifactBucket.Arn

@@ -1,0 +1,71 @@
+# This template creates S3 bucket policies for the ir-bunker artefact storage bucket.
+# © 2020 Amazon Web Services, Inc. or its affiliates. All Rights Reserved.  
+# This AWS Content is provided subject to the terms of the AWS Customer Agreement available at  
+# http://aws.amazon.com/agreement or other written agreement between Customer and either
+# Amazon Web Services, Inc. or Amazon Web Services EMEA SARL or both.
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  CloudFormation template to deploy and configure IR bunker S3 bucket policies 
+Parameters:
+  pSecurtiyAccount:
+    Type: String
+    Description: AWS Account Number of the Security Account where snapshot processing occurs
+    AllowedPattern: "[0-9]*"
+    MaxLength: 12
+    MinLength: 12
+    ConstraintDescription: account number must contain only numbers.
+  S3IRArtifactBucket:
+    Type: String
+    Description: Forensic Account S3 Artifact Bucket
+    AllowedPattern: "[a-zA-Z0-9-.]*"
+    ConstraintDescription: bucket name must contain only lowercase letters, numbers, periods (.), and dashes (-).
+
+
+Resources:
+  S3IRArtifactBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3IRArtifactBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: DenyInsecureConnections
+          Effect: Deny
+          Principal: "*"
+          Action: s3:*
+          Resource: 
+            - !Sub "arn:${AWS::Partition}:s3:::${S3IRArtifactBucket}/*"
+          Condition:
+            Bool:
+              aws:SecureTransport: 'false'
+        - Sid: SnapshotProcessingAccess
+          Effect: Allow
+          Principal:
+            AWS: !Sub arn:aws:iam::${pSecurtiyAccount}:role/SnapshotAutomationS3Copy
+          Action:
+            - s3:AbortMultipartUpload
+            - s3:GetBucketLocation
+            - s3:GetObject
+            - s3:ListBucket
+            - s3:ListBucketMultipartUploads
+            - s3:PutObject
+            - s3:PutObjectAcl
+          Resource:
+            - !Sub "arn:${AWS::Partition}:s3:::${S3IRArtifactBucket}/*"
+            - !Sub "arn:${AWS::Partition}:s3:::${S3IRArtifactBucket}"
+        - Sid: MemoryAcquisitionAccess
+          Effect: Allow
+          Principal:
+            AWS: !Sub arn:aws:iam::${pSecurtiyAccount}:role/MemoryAcquisition
+          Action:
+            - s3:AbortMultipartUpload
+            - s3:GetBucketLocation
+            - s3:GetObject
+            - s3:ListBucket
+            - s3:ListBucketMultipartUploads
+            - s3:PutObject
+            - s3:PutObjectAcl
+          Resource:
+            - !Sub "arn:${AWS::Partition}:s3:::${S3IRArtifactBucket}/*"
+            - !Sub "arn:${AWS::Partition}:s3:::${S3IRArtifactBucket}"
+        - !Ref AWS::NoValue

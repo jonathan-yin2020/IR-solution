@@ -1,0 +1,671 @@
+{    "StartAt": "RunForensics",
+    "Comment": "Snapshot AutomationState Machine", 
+    "States": {
+      "RunForensics": {
+      "Type": "Parallel",
+      "Branches": [
+       { 
+         "StartAt": "CreateSnapshot",
+         "States": {
+         "Failed-Disk": {
+          "Type": "Fail",
+          "Cause": "$"
+      },
+         "CreateSnapshot": {
+                    "Resource": "${rCreateSnapshotFromInstance.Arn}",
+                    "ResultPath": "$.CreateSnapshots",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "WaitForSnapshots", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 3,
+                            "BackoffRate": 1
+                        }
+                    ],
+                    "Catch": [ 
+                    {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.CreateSnapshot.error"
+                    }
+                    ]
+                },
+                "WaitForSnapshots": {
+                    "Type": "Wait",
+                    "Seconds": 10,
+                    "Next": "CheckSnapshotStatusFromInstance"
+                },
+                "CheckSnapshotStatusFromInstance": {
+                    "Resource": "${rCheckSnapshotStatus.Arn}",
+                    "ResultPath": "$.SnapshotStatus",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "CopySnapshotsForSharing", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "WaitException" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 10,
+                            "BackoffRate": 2
+                        },
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 3,
+                            "BackoffRate": 1
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.SnapshotStatus.error"
+                    } ]
+                },
+                "CopySnapshotsForSharing": {
+                    "Resource": "${rCopySnapshotSharing.Arn}",
+                    "ResultPath": "$.CopySnapshotsSharing",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "WaitForCopySnapshotsSharing", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 30,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.CopySnapshotsSharing.error"
+                    } ]
+                },
+                "WaitForCopySnapshotsSharing": {
+                    "Type": "Wait",
+                    "Seconds": 10,
+                    "Next": "SnapshotCopySharingStatus"
+                },
+                "SnapshotCopySharingStatus": {
+                    "Resource": "${rCheckSnapshotCopySharingStatus.Arn}",
+                    "ResultPath": "$.SnapshotCopySharingStatus",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "CopySnapshots", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "WaitException" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 10,
+                            "BackoffRate": 2
+                        },
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 3,
+                            "BackoffRate": 1
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.SnapshotCopySharingStatus.error"
+                    } ]
+                },      
+                "CopySnapshots": {
+                    "Resource": "${rCopySnapshotsToSecurity.Arn}",
+                    "ResultPath": "$.CopySnapshots",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "WaitForCopySnapshots", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 30,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.CopySnapshots.error"
+                    } ]
+                },
+                "WaitForCopySnapshots": {
+                    "Type": "Wait",
+                    "Seconds": 10,
+                    "Next": "SnapshotCopyStatus"
+                },
+                "SnapshotCopyStatus": {
+                    "Resource": "${rCheckSnapshotCopyStatus.Arn}",
+                    "ResultPath": "$.SnapshotStatus",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "CreateVolumesForDD", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "WaitException" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 10,
+                            "BackoffRate": 2
+                        },
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 3,
+                            "BackoffRate": 1
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.SnapshotStatus.error"
+                    } ]
+                },      
+                "CreateVolumesForDD": {
+                    "Resource": "${rCreateVolumesDD.Arn}",
+                    "ResultPath": "$.CreateVolumesDD",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "WaitForVolumesDD", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 30,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.CreateVolumes.error"
+                    } ]
+                },
+                "WaitForVolumesDD": {
+                    "Type": "Wait",
+                    "Seconds": 5,
+                    "Next": "VolumeForDDStatus"
+                },
+                "VolumeForDDStatus": {
+                    "Resource": "${rCheckVolumeDDStatus.Arn}",
+                    "ResultPath": "$.CheckVolumeDDStatus",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "CreateTargetUrls", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "WaitException" ],
+                            "IntervalSeconds": 30,
+                            "MaxAttempts": 10,
+                            "BackoffRate": 2
+                        },
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 3,
+                            "BackoffRate": 1
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.CheckVolumeStatus.error"
+                    } ]
+                },
+                "CreateTargetUrls": {
+                    "Resource": "${rCreateTargetUrls.Arn}",
+                    "ResultPath": "$.CreateTargetUrls",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "GetLocationData", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 30,
+                            "MaxAttempts": 10,
+                            "BackoffRate": 2
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.CreateTargetUrls.error"
+                    } ]
+                },
+                "GetLocationData": {
+                    "Resource": "${rGetLocationData.Arn}",
+                    "ResultPath": "$.GetLocationData",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "RunInstancesForDd", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 30,
+                            "MaxAttempts": 10,
+                            "BackoffRate": 2
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.GetLocationData.error"
+                    } ]
+                },
+                "RunInstancesForDd": {
+                    "Resource": "${rRunInstancesForDd.Arn}",
+                    "ResultPath": "$.RunInstancesForDd",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60,  
+                    "Next": "WaitForInstance", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 30,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.RunInstancesForDd.error"
+                    } ]
+                },                  
+                "WaitForInstance": {
+                    "Type": "Wait",
+                    "Seconds": 120,
+                    "Next": "CheckInstanceStatusCmd"
+                },
+                "CheckInstanceStatusCmd": {
+                    "Resource": "${rCheckInstanceStatusCmd.Arn}",
+                    "ResultPath": "$.CheckInstanceStatusCmd",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "CheckInstanceStatus", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 300,
+                            "MaxAttempts": 31,
+                            "BackoffRate": 1.09
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.CheckInstanceStatusCmd.error"
+                    } ]
+                },
+                "CheckInstanceStatus": {
+                    "Resource": "${rCheckInstanceStatus.Arn}",
+                    "ResultPath": "$.CheckInstanceStatusCmd",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "StartCopy", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "WaitException" ],
+                            "IntervalSeconds": 300,
+                            "MaxAttempts": 31,
+                            "BackoffRate": 1.09
+                        },
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 3,
+                            "BackoffRate": 1
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.CheckInstanceStatus.error"
+                    } ]
+                },
+                "StartCopy": {
+                    "Resource": "${rStartCopy.Arn}",
+                    "ResultPath": "$.StartCopy",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "DdStatus", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 3,
+                            "BackoffRate": 1
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.StartCopy.error"
+                    } ]
+                },
+                "DdStatus": {
+                    "Resource": "${rDdStatus.Arn}",
+                    "ResultPath": "$.DdStatus",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 172800,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "DetachVolumes", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "WaitException" ],
+                            "IntervalSeconds": 300,
+                            "MaxAttempts": 31,
+                            "BackoffRate": 1.09
+                        },
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 3,
+                            "BackoffRate": 1
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.DdStatus.error"
+                    } ]
+                },
+                  "DetachVolumes": {
+                    "Resource": "${rDetachVolumes.Arn}",
+                    "ResultPath": "$.DetachVolumes",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "WaitForDetatchVolumes", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 3,
+                            "BackoffRate": 1
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "FailureCleanup",
+                        "ResultPath": "$.StartCopy.error"
+                    } ]
+                },                  
+                "WaitForDetatchVolumes": {
+                    "Type": "Wait",
+                    "Seconds": 60,
+                    "Next": "DeleteSourceArtifacts"
+                },
+                "DeleteSourceArtifacts": {
+                    "Resource": "${rDeleteArtifactsSource.Arn}",
+                    "ResultPath": "$.DeleteSourceArtifacts",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "ChoiceStateDelete", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2
+                        },
+                        {
+                            "ErrorEquals": [ "WaitException" ],
+                            "IntervalSeconds": 300,
+                            "MaxAttempts": 31,
+                            "BackoffRate": 1.09
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "Failed",
+                        "ResultPath": "$.DeleteSnapshot.error"
+                    } ]
+                },
+                "ChoiceStateDelete": {
+                "Type": "Choice",
+                "Choices": [
+                  {
+                      "Variable": "$.RetainArtefacts",
+                      "StringEquals": "true",
+                      "Next": "DeleteInstanceAndVolumesSecurityAccount"
+                  },
+                  {
+                    "Variable": "$.RetainArtefacts",
+                    "StringEquals": "false",
+                    "Next": "DeleteSnapshotsSecurityAccount"
+                  }
+                ],
+                "Default": "DeleteSnapshotsSecurityAccount"
+                },
+                "DeleteInstanceAndVolumesSecurityAccount": {
+                    "Resource": "${rDeleteInstanceAndVolumesSecurityAccount.Arn}",
+                    "ResultPath": "$.DeleteInstanceAndVolumesSecurityAccount",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "EndState", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2
+                        },
+                        {
+                            "ErrorEquals": [ "WaitException" ],
+                            "IntervalSeconds": 300,
+                            "MaxAttempts": 31,
+                            "BackoffRate": 1.09
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "Failed",
+                        "ResultPath": "$.DeleteSnapshot.error"
+                    } ]
+                },
+                "DeleteSnapshotsSecurityAccount": {
+                    "Resource": "${rDeleteSnapshotsSecurityAccount.Arn}",
+                    "ResultPath": "$.DeleteSnapshotsSecurityAccount",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "DeleteInstanceAndVolumesSecurityAccount", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2
+                        },
+                        {
+                            "ErrorEquals": [ "WaitException" ],
+                            "IntervalSeconds": 300,
+                            "MaxAttempts": 31,
+                            "BackoffRate": 1.09
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "Failed",
+                        "ResultPath": "$.DeleteSnapshot.error"
+                    } ]
+                },                           
+                "FailureCleanup": {
+                    "Resource": "${rDeleteCleanup.Arn}",
+                    "ResultPath": "$.FailureCleanup",
+                    "InputPath": "$",
+                    "TimeoutSeconds": 86400,
+                    "HeartbeatSeconds": 60, 
+                    "Next": "Failed", 
+                    "Type": "Task",
+                    "Retry": [
+                        {
+                            "ErrorEquals": [ "States.Timeout" ],
+                            "IntervalSeconds": 10,
+                            "MaxAttempts": 5,
+                            "BackoffRate": 2
+                        }
+                    ],
+                    "Catch": [ {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "Next": "Failed",
+                        "ResultPath": "$"
+                    } ]
+                },                  
+                "EndState": {
+                    "End": true, 
+                    "Type": "Pass"
+                }                  
+            }                  
+    
+    }},
+        {"StartAt": "DumpMemory",
+          "States":{
+          "Failed-Mem": {
+          "Type": "Fail",
+          "Cause": "$"
+      },
+          "DumpMemory": {
+                      "Resource": "${rDumpMemory.Arn}",
+                      "ResultPath": "$.DumpMemory",
+                      "InputPath": "$",
+                      "TimeoutSeconds": 86400,
+                      "HeartbeatSeconds": 60, 
+                      "Next": "WaitForMemdump", 
+                      "Type": "Task",
+                      "Retry": [
+                          {
+                              "ErrorEquals": [ "States.Timeout" ],
+                              "IntervalSeconds": 30,
+                              "MaxAttempts": 10,
+                              "BackoffRate": 2
+                          }
+                      ],
+                      "Catch": [ {
+                          "ErrorEquals": [ "States.ALL" ],
+                          "Next": "Failed",
+                          "ResultPath": "$.DumpMemory.error"
+                      } ]
+                  },
+                  "WaitForMemdump": {
+                      "Type": "Wait",
+                      "Seconds": 5,
+                      "Next": "CheckDumpStatus"
+                  },
+                  "CheckDumpStatus": {
+                      "Resource": "${rCheckDumpStatus.Arn}",
+                      "ResultPath": "$.CheckDumpStatus",
+                      "InputPath": "$",
+                      "TimeoutSeconds": 86400,
+                      "HeartbeatSeconds": 60, 
+                      "Next": "EndState", 
+                      "Type": "Task",
+                      "Retry": [
+                          {
+                              "ErrorEquals": [ "WaitException" ],
+                              "IntervalSeconds": 300,
+                              "MaxAttempts": 31,
+                              "BackoffRate": 1.09
+                          },
+                          {
+                              "ErrorEquals": [ "States.Timeout" ],
+                              "IntervalSeconds": 10,
+                              "MaxAttempts": 3,
+                              "BackoffRate": 1
+                          }                          
+                      ],
+                      "Catch": [ {
+                          "ErrorEquals": [ "States.ALL" ],
+                          "Next": "Failed",
+                          "ResultPath": "$.CheckDumpStatus.error"
+                      } ]
+                  },
+                  "EndState": {
+                      "End": true, 
+                      "Type": "Pass"
+                  }              
+  
+  }}
+      ],
+        "ResultPath": "$.ParralelOutput",
+            "Catch": [{
+                "Comment": "This catch should never catch any errors, as the error handling is done in the individual Branches",
+                "ErrorEquals": ["States.ALL"],
+                "ResultPath": "$.ParralelOutput",
+                "Next": "TagForIsolation"
+            }],
+            "Next": "TagForIsolation"
+        }, 
+      "TagForIsolation": {
+            "Resource": "arn:aws:lambda:us-east-2:540709705818:function:TagForIsolation",
+            "ResultPath": "$.TagForIsolation",
+            "InputPath": "$",
+            "TimeoutSeconds": 86400,
+            "HeartbeatSeconds": 60, 
+            "End": true,
+            "Type": "Task",
+            "Retry": [
+                {
+                    "ErrorEquals": [ "States.Timeout" ],
+                    "IntervalSeconds": 10,
+                    "MaxAttempts": 5,
+                    "BackoffRate": 2
+                },
+                {
+                    "ErrorEquals": [ "WaitException" ],
+                    "IntervalSeconds": 300,
+                    "MaxAttempts": 31,
+                    "BackoffRate": 1.09
+                }
+            ],
+            "Catch": [ {
+                "ErrorEquals": [ "States.ALL" ],
+                "Next": "Failed-End",
+                "ResultPath": "$.TagForIsolation.error"
+            } ]
+        },"Failed-End": {
+          "Type": "Fail",
+          "Cause": "$"
+        }
+    }}
